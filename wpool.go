@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
@@ -11,7 +12,8 @@ type Task interface {
 
 // WPool - workers pool
 type WPool struct {
-	ctx context.Context
+	parentCtx context.Context
+	ctx       context.Context
 
 	count int
 	in    chan Task
@@ -21,6 +23,7 @@ type WPool struct {
 	wg    sync.WaitGroup
 
 	enabled bool
+	stopped bool
 }
 
 func NewWPool(ctx context.Context, count int) *WPool {
@@ -31,12 +34,13 @@ func NewWPool(ctx context.Context, count int) *WPool {
 	childCtx, cancel := context.WithCancel(ctx)
 
 	wp := &WPool{
-		ctx:   childCtx,
-		stop:  cancel,
-		count: count,
-		in:    make(chan Task),
-		ins:   []chan Task{},
-		out:   make(chan Task),
+		parentCtx: ctx,
+		ctx:       childCtx,
+		stop:      cancel,
+		count:     count,
+		in:        make(chan Task),
+		ins:       []chan Task{},
+		out:       make(chan Task),
 	}
 
 	for i := 0; i < count; i++ {
@@ -47,9 +51,16 @@ func NewWPool(ctx context.Context, count int) *WPool {
 }
 
 // Put - Добавление задачи в пул
-func (w *WPool) Put(task Task) {
+func (w *WPool) Put(task Task) (err error) {
+	if !w.enabled {
+		if w.count == 0 {
+			return errors.New("can't put task into non created WPool. Create this one with NewWPool")
+		}
+		return errors.New("can't put task into stopped WPool. Use WPool.Start() before put new task into stopped WPool")
+	}
 	w.in <- task
 	w.wg.Add(1)
+	return
 }
 
 // Start - Включение работы пула задач.
@@ -57,6 +68,10 @@ func (w *WPool) Put(task Task) {
 func (w *WPool) Start() {
 	if w.enabled {
 		return
+	}
+
+	if w.stopped {
+		*w = *NewWPool(w.parentCtx, w.count)
 	}
 
 	// Распределение задач между каналами
@@ -94,11 +109,12 @@ func (w *WPool) Start() {
 
 // Stop - Ждет, пока оставшиеся задачи закончат свое выполнение и выключает работу пула.
 func (w *WPool) Stop() {
-	if !w.enabled {
+	if !w.enabled || w.stopped {
 		return
 	}
 	w.wg.Wait()
 
 	w.stop()
 	w.enabled = false
+	w.stopped = true
 }

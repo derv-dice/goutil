@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ProgressBar UI</title>
+
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: lightgrey;
+        }
+    </style>
+</head>
+<body>
+<div id="pbs" style="margin: 15px 0 0 33%;width: 33%">
+    <div>Загрузка...</div>
+</div>
+</body>
+
+<script>
+    let ws = new WebSocket("ws://localhost{{.addr}}/updates");
+
+    window.onload = function () {
+        fetch('http://localhost{{.addr}}/refresh')
+            .then((response) => {
+                return response.json();
+            })
+            .then((data) => {
+                render(data);
+            });
+    }
+
+    ws.onmessage = function (e) {
+        // console.log('ws [message] Data received from server: ' + e.data)
+        let data = {progressBars: []} = JSON.parse(e.data)
+        render(data)
+    }
+
+    ws.onopen = function (e) {
+       // console.log('ws [open] Connection established')
+    }
+
+    ws.onclose = function (e) {
+        // console.log('ws [close] Connection closed');
+    }
+
+    function render(json_obj) {
+        let node = document.getElementById('pbs');
+        node.innerHTML = "";
+        json_obj.progressBars.forEach(elem => {
+            let newNode = document.createElement('span');
+            newNode.innerHTML = `
+                <div style="background-color: whitesmoke; margin: 25px 0; padding: 5px; border-radius: 5px; box-shadow: 4px 4px 8px 0 rgba(34, 60, 80, 0.2);">
+                        <div>${elem.Name}</div>
+                        <div>
+                            <progress style="width:100%" max="${elem.Max}" value="${elem.Val}"></progress>
+                        </div>
+                        <div>> count: ${elem.Val}/${elem.Max}</div>
+                </div>`
+            node.appendChild(newNode);
+        })
+    }
+</script>
+</html>

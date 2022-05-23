@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func Log() *zerolog.Logger {
@@ -16,50 +15,80 @@ func Log() *zerolog.Logger {
 
 const defaultLogsDir = "./logs"
 
+const (
+	LevelTrace = "trace"
+	LevelDebug = "debug"
+	LevelInfo  = "info"
+	LevelWarn  = "warn"
+	LevelError = "error"
+	LevelFatal = "fatal"
+	LevelPanic = "panic"
+)
+
 var logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-// InitLogs - Настройка логирования
-// pretty - Вывод лога в stdout в формате '8:37PM INF Message'
-// colored - работает только в связке с pretty и делает лог цветным или монохромным
-// file - Писать ли логи в файл. Если true, то создается папка ./logs и в нее пишется тот же лог, что и в stdout,
-//	но в формате json для более удобного парсинга логов, если понадобится
-func InitLogs(pretty, colored, file bool, logsDir string) (err error) {
-	multiWR := zerolog.MultiLevelWriter(os.Stdout)
-	var f io.Writer
+// InitLoggerConf - Конфигуратор логов
+// - Level: Уровень логов <trace | debug | info | warn | error | fatal | panic>. По умолчанию - info
+// - Pretty: В stdout будет выводиться лог формате '1:01PM LEVEL MESSAGE'
+// - Colored: В stdout будет выводиться цветной лог (Работает только если Pretty=true)
+// - ToFile: Логировать ли в файл
+// - Dir: В какую директорию положить файл с логами (Работает только если ToFile=true). По умолчанию - ./logs/
+// - CodeLine: Логирование строки кода
+type InitLoggerConf struct {
+	Level    string
+	Pretty   bool
+	Colored  bool
+	ToFile   bool
+	Dir      string
+	CodeLine bool
+}
 
-	if file {
-		if logsDir == "" {
-			logsDir = defaultLogsDir
+func InitLogger(conf InitLoggerConf) (err error) {
+	var writers []io.Writer
+
+	if conf.ToFile {
+		if conf.Dir == "" {
+			conf.Dir = defaultLogsDir
 		}
 
-		if _, err = os.Stat(logsDir); os.IsNotExist(err) {
-			if err = os.MkdirAll(logsDir, 0777); err != nil {
+		if _, err = os.Stat(conf.Dir); os.IsNotExist(err) {
+			if err = os.MkdirAll(conf.Dir, 0775); err != nil {
 				return
 			}
 		}
 
-		if f, err = os.Create(path.Join(logsDir, time.Now().Format("2006-01-02_15:04:05.log"))); err != nil {
+		var f io.Writer
+		if f, err = os.Create(path.Join(conf.Dir, time.Now().Format("2006-01-02_15:04:05.log"))); err != nil {
 			return
 		}
 
-		multiWR = zerolog.MultiLevelWriter(os.Stdout, f)
-		logger = log.Output(multiWR)
+		writers = append(writers, f)
 	}
 
-	if pretty {
-		consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout}
-
-		if !colored {
-			consoleWriter.NoColor = true
+	if conf.Pretty {
+		cw := zerolog.ConsoleWriter{Out: os.Stdout}
+		if !conf.Colored {
+			cw.NoColor = true
 		}
 
-		if f == nil {
-			multiWR = zerolog.MultiLevelWriter(consoleWriter)
-		} else {
-			multiWR = zerolog.MultiLevelWriter(consoleWriter, f)
-		}
+		writers = append(writers, cw)
+	} else {
+		writers = append(writers, os.Stdout)
+	}
 
-		logger = zerolog.New(multiWR).With().Timestamp().Logger()
+	var lvl zerolog.Level
+	if conf.Level == "" {
+		lvl = zerolog.InfoLevel
+	} else {
+		if lvl, err = zerolog.ParseLevel(conf.Level); err != nil {
+			return
+		}
+	}
+
+	logger = zerolog.New(zerolog.MultiLevelWriter(writers...)).Level(lvl).With().Timestamp().Logger()
+
+	if conf.CodeLine {
+		logger = logger.With().Caller().Logger()
 	}
 
 	return

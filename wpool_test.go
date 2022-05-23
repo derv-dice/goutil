@@ -22,11 +22,17 @@ func TestNewWPool(t *testing.T) {
 	wp.Start()
 
 	clock := time.Now()
-	wp.Put(new(TestTask))
-	wp.Put(new(TestTask))
-	wp.Put(new(TestTask))
-	wp.Put(new(TestTask))
-	wp.Put(new(TestTask))
+	var err error
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
 	wp.Stop()
 
 	check := time.Since(clock)
@@ -34,4 +40,17 @@ func TestNewWPool(t *testing.T) {
 	assert.Equal(t, 5, successCounter)   // Все задачи выполнены
 	assert.Less(t, check, time.Second*2) // Общее время выполнения должно быть меньше 2 секунд (будет 1с)
 	// В 1 поток было бы минимум 5с.
+	wp.Start()
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	err = wp.Put(new(TestTask))
+	assert.NoError(t, err)
+	wp.Stop()
+	assert.Equal(t, 10, successCounter)
 }

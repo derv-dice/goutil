@@ -2,12 +2,13 @@ package main
 
 import (
 	"bufio"
-	"encoding/csv"
+	"crypto/md5"
+	"encoding/hex"
 	"os"
 )
 
 // ReadFileLineByLine - reads file line by line in string slice
-func ReadFileLineByLine(filename string) (lines []string, err error) {
+func ReadFileLineByLine(filename string, unique bool) (lines []string, err error) {
 	var file *os.File
 	if file, err = os.Open(filename); err != nil {
 		return
@@ -21,7 +22,23 @@ func ReadFileLineByLine(filename string) (lines []string, err error) {
 	}()
 
 	s := bufio.NewScanner(file)
+
+	var uniqMap map[string]bool
+	if unique {
+		uniqMap = map[string]bool{}
+	}
+
 	for s.Scan() {
+		if unique {
+			hash := hashFromString(s.Text())
+
+			if uniqMap[hash] {
+				continue
+			}
+
+			uniqMap[hash] = true
+		}
+
 		lines = append(lines, s.Text())
 	}
 
@@ -29,34 +46,8 @@ func ReadFileLineByLine(filename string) (lines []string, err error) {
 	return
 }
 
-// WriteCSV - Создает и заполняет указанный .csv файл. Если заголовки не нужны, то указать headers = nil
-func WriteCSV(filename string, headers []string, records [][]string) (err error) {
-	var file *os.File
-	if file, err = os.Create(filename); err != nil {
-		return
-	}
-
-	defer func() {
-		cErr := file.Close()
-		if cErr != nil {
-			Log().Warn().Err(cErr).Send()
-		}
-	}()
-
-	w := csv.NewWriter(file)
-	defer w.Flush()
-
-	if headers != nil {
-		if err = w.Write(headers); err != nil {
-			return
-		}
-	}
-
-	for i := range records {
-		if err = w.Write(records[i]); err != nil {
-			return
-		}
-	}
-
-	return
+func hashFromString(str string) string {
+	h := md5.New()
+	h.Write([]byte(str))
+	return hex.EncodeToString(h.Sum(nil))
 }
