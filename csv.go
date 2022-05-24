@@ -1,4 +1,4 @@
-package main
+package goutil
 
 import (
 	"encoding/csv"
