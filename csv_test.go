@@ -19,10 +19,17 @@ func TestWriterCSV(t *testing.T) {
 		t.FailNow()
 	}
 
-	err = wr.WriteRow(TestScsStruct{
-		Col1: 123,
-		Col2: "1111",
-		Col3: time.Now(),
+	err = wr.WriteRow([]*TestScsStruct{
+		{
+			Col1: 123,
+			Col2: "1111",
+			Col3: time.Now(),
+		},
+		{
+			Col1: 124,
+			Col2: "2222",
+			Col3: time.Now().Add(time.Hour),
+		},
 	})
 
 	assert.NoError(t, err)
